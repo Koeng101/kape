@@ -48,8 +48,8 @@ FEATURES             Location/Qualifiers
                      /note="In lacZ gene"
      primer_bind     603..619
                      /label=M13 rev
-                     /note="common sequencing primer, one of multiple 
-                     similarvariants"
+                     /note="common sequencing primer, one of multiple
+                     similar variants"
      primer_bind     603..619
                      /label=M13 Reverse
                      /note="In lacZ gene. Also called M13-rev"
