@@ -3,10 +3,11 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/TimothyStiles/poly/io/genbank"
-	"github.com/rivo/tview"
 	"os"
 	"strings"
+
+	"github.com/TimothyStiles/poly/io/genbank"
+	"github.com/rivo/tview"
 )
 
 func createKeyValuePairs(m map[string]string) string {
@@ -32,6 +33,9 @@ func main() {
 	fileName := args[0]
 	genbankFile := genbank.Read(fileName)
 	sequence := strings.ToUpper(genbankFile.Sequence)
+
+	actionView := tview.NewList().AddItem("GoldenGate", "Do a goldengate reaction", 'a', nil)
+	actionView.SetBorder(true)
 
 	featureView := tview.NewList()
 	featureView.SetBorder(true)
@@ -69,10 +73,12 @@ func main() {
 		SetText(b.String())
 	textView.SetBorder(true)
 
+	actionFlex := tview.NewFlex().AddItem(featureView, 0, 2, true).AddItem(actionView, 0, 1, true)
+
 	flex := tview.NewFlex().
 		SetDirection(tview.FlexRow).
 		AddItem(textView, 0, 2, false).
-		AddItem(featureView, 0, 1, true)
+		AddItem(actionFlex, 0, 1, true)
 
 	if err := app.SetRoot(flex, true).SetFocus(featureView).Run(); err != nil {
 		panic(err)
