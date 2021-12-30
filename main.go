@@ -3,12 +3,30 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/TimothyStiles/poly/io/genbank"
 	"github.com/rivo/tview"
 )
+
+func openVim(fpath string) error {
+	cmd := exec.Command("nvim", fpath)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+	err = cmd.Wait()
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func createKeyValuePairs(m map[string]string) string {
 	b := new(bytes.Buffer)
@@ -25,12 +43,17 @@ type colorInput struct {
 }
 
 func main() {
+	var err error
 	colors := []string{"red", "green", "purple", "orange", "blue", "brown", "yellow", "pink"}
 	args := os.Args[1:]
 	if len(args) != 1 {
 		panic("Only one file input allowed")
 	}
 	fileName := args[0]
+	err = openVim(fileName)
+	if err != nil {
+		log.Fatalf("failed to open!")
+	}
 	genbankFile := genbank.Read(fileName)
 	sequence := strings.ToUpper(genbankFile.Sequence)
 
