@@ -5,29 +5,114 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/TimothyStiles/poly/io/genbank"
-	"github.com/rivo/tview"
+	"github.com/jroimartin/gocui"
 )
 
-func openVim(fpath string) error {
-	cmd := exec.Command("nvim", fpath)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Start()
+// View handling
+func defaultView(g *gocui.Gui, v *gocui.View) error {
+	_, err := g.SetCurrentView("default")
+	return err
+}
+
+func sequenceView(g *gocui.Gui, v *gocui.View) error {
+	_, err := g.SetCurrentView("sequence")
+	return err
+}
+
+func actionView(g *gocui.Gui, v *gocui.View) error {
+	_, err := g.SetCurrentView("action")
 	if err != nil {
 		return err
 	}
-	err = cmd.Wait()
-	if err != nil {
+	return err
+}
+
+func featuresView(g *gocui.Gui, v *gocui.View) error {
+	_, err := g.SetCurrentView("features")
+	return err
+}
+
+func quit(g *gocui.Gui, v *gocui.View) error {
+	return gocui.ErrQuit
+}
+
+// Handlers
+func actionHandler(g *gocui.Gui, v *gocui.View) error {
+	v.Clear()
+	return v.SetCursor(v.Origin())
+}
+
+// Layout
+func layout(g *gocui.Gui) error {
+	maxX, maxY := g.Size()
+	if v, err := g.SetView("sequence", maxX/4, -1, maxX, maxY-2); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+
+		}
+		fmt.Fprintf(v, seq)
+		v.Editable = true
+		v.Wrap = true
+	}
+	if v, err := g.SetView("features", -1, -1, maxX/4, maxY-2); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		for _, feature := range features {
+			fmt.Fprintf(v, feature)
+		}
+	}
+	if v, err := g.SetView("action", -1, maxY-2, maxX, maxY); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		v.Editable = true
+		v.Wrap = true
+	}
+	if _, err := g.SetView("default", maxX+1, maxY+1, maxX+2, maxY+2); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		if _, err := g.SetCurrentView("default"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Keybindings
+
+func keybindings(g *gocui.Gui) error {
+	// Quit with ctrl+c
+	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("", gocui.KeyEsc, gocui.ModNone, defaultView); err != nil {
+		return err
+	}
+
+	// Focus switching
+	if err := g.SetKeybinding("default", 's', gocui.ModNone, sequenceView); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("default", 'a', gocui.ModNone, actionView); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("default", ':', gocui.ModNone, actionView); err != nil {
+		return err
+	}
+
+	// action
+	if err := g.SetKeybinding("action", gocui.KeyEnter, gocui.ModNone, actionHandler); err != nil {
 		return err
 	}
 	return nil
 }
 
+// main
 func createKeyValuePairs(m map[string]string) string {
 	b := new(bytes.Buffer)
 	for key, value := range m {
@@ -36,74 +121,37 @@ func createKeyValuePairs(m map[string]string) string {
 	return b.String()
 }
 
-type colorInput struct {
-	Color    string
-	Location int
-	Start    bool
-}
+var seq string
+var features []string
 
 func main() {
-	var err error
-	colors := []string{"red", "green", "purple", "orange", "blue", "brown", "yellow", "pink"}
 	args := os.Args[1:]
 	if len(args) != 1 {
 		panic("Only one file input allowed")
 	}
 	fileName := args[0]
-	err = openVim(fileName)
-	if err != nil {
-		log.Fatalf("failed to open!")
-	}
 	genbankFile := genbank.Read(fileName)
-	sequence := strings.ToUpper(genbankFile.Sequence)
+	seq = strings.ToUpper(genbankFile.Sequence)
+	for _, feature := range genbankFile.Features {
+		features = append(features, createKeyValuePairs(feature.Attributes))
 
-	actionView := tview.NewList().AddItem("GoldenGate", "Do a goldengate reaction", 'a', nil)
-	actionView.SetBorder(true)
-
-	featureView := tview.NewList()
-	featureView.SetBorder(true)
-
-	var colorInputs []colorInput
-	for i, feature := range genbankFile.Features {
-		var color string
-		if feature.Type != "source" {
-			colorIdx := i
-			for colorIdx >= len(colors) {
-				colorIdx = colorIdx - len(colors)
-			}
-			color = colors[colorIdx]
-			colorInputs = append(colorInputs, colorInput{"[:" + color + "]", feature.SequenceLocation.Start, true})
-			colorInputs = append(colorInputs, colorInput{"[-:-:-]", feature.SequenceLocation.End, false})
-		}
-		featureView.AddItem(feature.GbkLocationString, "["+color+"]"+createKeyValuePairs(feature.Attributes), rune(i), nil)
 	}
 
-	var b strings.Builder
-	for i, base := range sequence {
-		for _, potentialInput := range colorInputs {
-			if i == potentialInput.Location {
-				fmt.Fprintf(&b, potentialInput.Color)
-			}
-		}
-		fmt.Fprintf(&b, string(base))
+	g, err := gocui.NewGui(gocui.OutputNormal)
+	if err != nil {
+		log.Panicln(err)
+	}
+	defer g.Close()
+
+	g.Cursor = true
+	g.InputEsc = true
+	g.SetManagerFunc(layout)
+
+	if err := keybindings(g); err != nil {
+		log.Panicln(err)
 	}
 
-	app := tview.NewApplication()
-	textView := tview.NewTextView().
-		SetDynamicColors(true).
-		SetWrap(true).
-		SetWordWrap(true).
-		SetText(b.String())
-	textView.SetBorder(true)
-
-	actionFlex := tview.NewFlex().AddItem(featureView, 0, 2, true).AddItem(actionView, 0, 1, true)
-
-	flex := tview.NewFlex().
-		SetDirection(tview.FlexRow).
-		AddItem(textView, 0, 2, false).
-		AddItem(actionFlex, 0, 1, true)
-
-	if err := app.SetRoot(flex, true).SetFocus(featureView).Run(); err != nil {
-		panic(err)
+	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
+		log.Panicln(err)
 	}
 }
