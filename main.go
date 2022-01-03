@@ -41,6 +41,9 @@ func quit(g *gocui.Gui, v *gocui.View) error {
 
 // Handlers
 func actionHandler(g *gocui.Gui, v *gocui.View) error {
+	if strings.TrimSpace(v.Buffer()) == "q" {
+		return gocui.ErrQuit
+	}
 	v.Clear()
 	return v.SetCursor(v.Origin())
 }
