@@ -11,12 +11,6 @@ import (
 	"github.com/jroimartin/gocui"
 )
 
-// View handling
-func defaultView(g *gocui.Gui, v *gocui.View) error {
-	_, err := g.SetCurrentView("default")
-	return err
-}
-
 func sequenceView(g *gocui.Gui, v *gocui.View) error {
 	_, err := g.SetCurrentView("sequence")
 	return err
@@ -27,6 +21,11 @@ func actionView(g *gocui.Gui, v *gocui.View) error {
 	if err != nil {
 		return err
 	}
+	return err
+}
+
+func bufferView(g *gocui.Gui, v *gocui.View) error {
+	_, err := g.SetCurrentView("buffer")
 	return err
 }
 
@@ -60,7 +59,13 @@ func layout(g *gocui.Gui) error {
 		v.Editable = true
 		v.Wrap = true
 	}
-	if v, err := g.SetView("features", -1, -1, maxX/4, maxY-2); err != nil {
+	if v, err := g.SetView("buffer", -1, -1, maxX/4, 1); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		fmt.Fprintf(v, "1")
+	}
+	if v, err := g.SetView("features", -1, 1, maxX/4, maxY-2); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
@@ -75,14 +80,6 @@ func layout(g *gocui.Gui) error {
 		v.Editable = true
 		v.Wrap = true
 	}
-	if _, err := g.SetView("default", maxX+1, maxY+1, maxX+2, maxY+2); err != nil {
-		if err != gocui.ErrUnknownView {
-			return err
-		}
-		if _, err := g.SetCurrentView("default"); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -93,18 +90,18 @@ func keybindings(g *gocui.Gui) error {
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
 		return err
 	}
-	if err := g.SetKeybinding("", gocui.KeyEsc, gocui.ModNone, defaultView); err != nil {
-		return err
-	}
 
-	// Focus switching
-	if err := g.SetKeybinding("default", 's', gocui.ModNone, sequenceView); err != nil {
+	// Focus switching from ctrl
+	if err := g.SetKeybinding("", gocui.KeyCtrlA, gocui.ModNone, actionView); err != nil {
 		return err
 	}
-	if err := g.SetKeybinding("default", 'a', gocui.ModNone, actionView); err != nil {
+	if err := g.SetKeybinding("", gocui.KeyCtrlS, gocui.ModNone, sequenceView); err != nil {
 		return err
 	}
-	if err := g.SetKeybinding("default", ':', gocui.ModNone, actionView); err != nil {
+	if err := g.SetKeybinding("", gocui.KeyCtrlD, gocui.ModNone, bufferView); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("", gocui.KeyCtrlF, gocui.ModNone, featuresView); err != nil {
 		return err
 	}
 
